@@ -1,0 +1,100 @@
+version: '3.1'
+
+services:
+  redis-service:
+    image: redis:alpine
+    restart: always
+    ports:
+      - 6397:6379
+    networks:
+      - siwp2005-service-net
+    
+  mongodb:
+    image: mongo
+    restart: always
+    command: mongod --auth
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: siwp2005_admin
+      MONGO_INITDB_ROOT_PASSWORD: siwp2005-password
+      MONGO_INITDB_DATABASE: siwp2005_final_project_db
+      MONGODB_DATA_DIR: /data/db
+      MONDODB_LOG_DIR: /dev/null
+    volumes:
+      - mongodbdata:/data/db
+    networks:
+      - siwp2005-service-net
+
+  mongo-express:
+    image: mongo-express
+    restart: always
+    ports:
+      - 8084:8081
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: siwp2005_admin
+      ME_CONFIG_MONGODB_ADMINPASSWORD: siwp2005-password
+      ME_CONFIG_MONGODB_URL: mongodb://siwp2005_admin:siwp2005-password@mongodb:27017/
+      ME_CONFIG_BASICAUTH_USERNAME: admin
+      ME_CONFIG_BASICAUTH_PASSWORD: admin
+    networks:
+      - siwp2005-service-net
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      args:
+        timezone: Asia/Singapore
+    depends_on:
+      - mongodb
+    restart: always
+    env_file:
+      - .env
+    environment:
+      - DEBUG=true # Disable this env to start with non-debug service
+      - SECRET_KEY=Mud9RRkWVvz2DHus95gaqdt_bbDSrFvaUgT57xISWFE
+      - MONGODB_HOSTNAME=mongodb
+      - MONGODB_PORT=27017
+      - MONGODB_DATABASE=siwp2005_final_project_db
+      - MONGODB_USERNAME=siwp2005_admin
+      - MONGODB_PASSWORD=siwp2005-password
+      - USERNAME_ADMIN=${USERNAME_ADMIN}
+      - PASSWORD_ADMIN=${PASSWORD_ADMIN}
+    ports:
+      - 5003:5000
+    volumes:
+      - ./backend/app:/app
+      - /var/run/docker.sock:/var/run/docker.sock
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "200k"
+        max-file: "10"
+    networks:
+      - siwp2005-service-net
+    command: "sh -c './run.sh'"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        timezone: Asia/Singapore
+    depends_on:
+      - mongodb
+    restart: always
+    env_file:
+      - .env
+    ports:
+      - 3003:3000
+    networks:
+      - siwp2005-service-net
+    command: "npm run dev"
+  
+
+volumes:
+  mongodbdata:
+    driver: local
+
+networks:
+  siwp2005-service-net:
+    name: siwp2005-service-net
